@@ -9,9 +9,12 @@ class Product extends Model
 {
     use HasFactory;
 
-    // Tambahkan id ke dalam fillable
+    protected $primaryKey = 'id';
+    public $incrementing = false;
+    protected $keyType = 'string';
+
     protected $fillable = [
-        'id',                // Menambahkan id
+        'id',
         'product_name',
         'description',
         'retail_price',
@@ -20,7 +23,4 @@ class Product extends Model
         'quantity',
         'product_image',
     ];
-
-    // Jika Anda menggunakan timestamps
-    public $timestamps = true; // Jika true, akan menggunakan created_at dan updated_at
 }

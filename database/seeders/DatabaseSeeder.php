@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Faker\Factory as Faker;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
@@ -13,11 +13,39 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $faker = Faker::create();
+        $lastProduct = DB::table('products')->orderBy('id', 'desc')->first();
+        $startId = $lastProduct ? (int)ltrim($lastProduct->id, '0') + 1 : 1;
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        $products = []; // Inisialisasi array produk di luar loop
+
+        for ($i = 0; $i < 100; $i++) {
+            $id = str_pad($startId + $i, 3, '0', STR_PAD_LEFT); // Gunakan padding yang sesuai (12 karakter)
+
+            $product_name = $faker->word();
+            $description = $faker->sentence();
+            $retail_price = $faker->randomFloat(2, 1000, 10000000);
+            $wholesale_price = $retail_price * 0.9;
+            $origin = strtoupper($faker->countryCode());
+            $quantity = $faker->numberBetween(1, 100);
+            $created_at = $faker->dateTimeBetween('-1 years', 'now');
+            $updated_at = $faker->dateTimeBetween($created_at, 'now');
+
+            $products[] = [
+                'id' => $id,
+                'product_name' => $product_name,
+                'description' => $description,
+                'retail_price' => $retail_price,
+                'wholesale_price' => $wholesale_price,
+                'origin' => $origin,
+                'quantity' => $quantity,
+                'created_at' => $created_at,
+                'updated_at' => $updated_at,
+            ];
+        }
+
+        if (!empty($products)) {
+            DB::table('products')->insert($products); // Masukkan data produk secara batch
+        }
     }
 }

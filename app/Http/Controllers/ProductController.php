@@ -3,36 +3,43 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
-use Illuminate\Container\Attributes\Storage;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage as FacadesStorage;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::all();
+        $query = Product::query();
+
+        if ($request->has('search') && $request->input('search') !== '') {
+            $searchTerm = $request->input('search');
+
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('id', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('product_name', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('description', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('retail_price', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('wholesale_price', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('origin', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('quantity', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('created_at', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('updated_at', 'like', '%' . $searchTerm . '%');
+            });
+        }
+
+        $products = $query->paginate(10);
         return view('products.index', compact('products'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
     public function create()
     {
         return view('products.create');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'id' => 'required|string|max:12',
             'product_name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'retail_price' => 'required|numeric',
@@ -42,51 +49,55 @@ class ProductController extends Controller
             'product_image' => 'nullable|image|mimes:jpg,png,jpeg|max:4096',
         ]);
 
-        // Handle the product image upload
+
+        $lastProduct = Product::orderBy('id', 'desc')->first();
+        $newId = $lastProduct ? str_pad((int)$lastProduct->id + 1, 3, '0', STR_PAD_LEFT) : '001';
+
         if ($request->hasFile('product_image')) {
             $imageName = time() . '_' . $request->file('product_image')->getClientOriginalName();
             $request->file('product_image')->storeAs('images', $imageName, 'public');
             $validated['product_image'] = $imageName;
         }
 
+        $validated['id'] = $newId;
+
         Product::create($validated);
         return redirect()->route('products.index')->with('success', 'Product added successfully!');
     }
 
-    /**
-     * Display the specified resource.
-     */
+
     public function show(string $id)
     {
-        $product = Product::findOrFail($id); // Menemukan produk berdasarkan ID
-        return view('products.show', compact('product'));
+        $product = Product::findOrFail($id);
+
+        $previousProduct = Product::where('id', '<', $id)->orderBy('id', 'desc')->first();
+        $nextProduct = Product::where('id', '>', $id)->orderBy('id', 'asc')->first();
+
+        return view('products.show', compact('product', 'previousProduct', 'nextProduct'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(Product $product)
     {
         return view('products.edit', compact('product'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Product $product)
     {
         $validated = $request->validate([
-            'product_name' => 'required|max:100',
+            'product_name' => 'required|max:255',
             'description' => 'nullable|max:1000',
             'retail_price' => 'required|numeric',
             'wholesale_price' => 'required|numeric',
             'origin' => 'required|size:2',
-            'quantity' => 'required|integer',
+            'quantity' => 'required|integer|min:0',
             'product_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:4096',
         ]);
 
-        // Handle the product image upload
         if ($request->hasFile('product_image')) {
+            if ($product->product_image) {
+                Storage::disk('public')->delete('images/' . $product->product_image);
+            }
+
             $imageName = time() . '_' . $request->file('product_image')->getClientOriginalName();
             $request->file('product_image')->storeAs('images', $imageName, 'public');
             $validated['product_image'] = $imageName;
@@ -96,14 +107,10 @@ class ProductController extends Controller
         return redirect()->route('products.index')->with('success', 'Product updated successfully!');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Product $product)
     {
-        // Optional: Delete the product image if it exists
         if ($product->product_image) {
-            FacadesStorage::disk('public')->delete('images/' . $product->product_image);
+            Storage::disk('public')->delete('images/' . $product->product_image);
         }
 
         $product->delete();
